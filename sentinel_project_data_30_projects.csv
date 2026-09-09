@@ -1,0 +1,31 @@
+project_id,project_name,sector,state,implementing_agency,planned_start_date,planned_completion_date,actual_start_date,approved_cost,revised_cost,current_status,reporting_date,physical_progress,planned_progress,financial_progress,expenditure,monthly_expenditure,contractor_status,milestones_completed,milestones_total,milestones_overdue
+PRJ-2026-001,Riverfront Flyover,Roads,Maharashtra,State PWD,2022-01-10,2024-11-25,2022-01-10,850.0,,On Track,2026-09-08,92.0,96.0,89.0,756.5,10.2,Satisfactory,9.2,10,0
+PRJ-2026-002,Green City Water Plant,Water,West Bengal,Municipal Corporation,2022-02-26,2025-04-11,2022-03-16,1085.75,1199.75,At Risk,2026-09-08,93.65,96.35,91.65,995.09,16.29,Slow Mobilization,10.3,11,1
+PRJ-2026-003,Smart Campus Solar,Energy,Karnataka,Urban Development Authority,2022-04-14,2025-08-26,2022-05-20,1321.5,,Delayed,2026-09-08,95.3,96.7,94.3,1246.17,23.79,Severe Delays,11.44,12,3
+PRJ-2026-004,Metro Station Phase 2,Railways,Tamil Nadu,Rail Development Corporation,2022-05-31,2026-01-10,2022-07-24,1557.25,1557.25,Critical,2026-09-08,96.0,97.05,95.0,1479.39,32.7,Good Progress,12.48,13,4
+PRJ-2026-005,Rural Road Upgrade,Healthcare,Odisha,State Water Board,2022-07-17,2026-05-27,2022-09-27,1793.0,,On Track,2026-09-08,96.0,89.4,95.0,1703.35,43.03,Satisfactory,13.44,14,4
+PRJ-2026-006,Urban Drainage Project,Education,Gujarat,State PWD,2022-09-02,2026-10-11,2022-09-02,2028.75,2241.77,At Risk,2026-09-08,80.25,89.75,82.25,1668.65,54.78,Slow Mobilization,12.04,15,5
+PRJ-2026-007,District Hospital Expansion,Urban Development,Rajasthan,Municipal Corporation,2022-10-19,2025-09-03,2022-11-06,2264.5,,Delayed,2026-09-08,81.9,90.1,78.9,1786.69,27.17,Severe Delays,13.1,16,1
+PRJ-2026-008,Highway Widening Package,Roads,Telangana,Urban Development Authority,2022-12-05,2026-01-18,2023-01-10,2500.25,2887.79,Critical,2026-09-08,83.55,90.45,81.55,2038.95,37.5,Good Progress,14.2,17,2
+PRJ-2026-009,Digital School Program,Water,Kerala,Rail Development Corporation,2023-01-21,2026-06-04,2023-03-16,2736.0,,On Track,2026-09-08,85.2,82.8,84.2,2303.71,49.25,Satisfactory,15.34,18,2
+PRJ-2026-010,Rail Overbridge Construction,Energy,Bihar,State Water Board,2023-03-09,2026-10-19,2023-05-20,2971.75,2971.75,At Risk,2026-09-08,86.85,83.15,86.85,2580.96,62.41,Slow Mobilization,16.5,19,3
+PRJ-2026-011,Industrial Park Development,Railways,Maharashtra,State PWD,2023-04-25,2027-03-05,2023-04-25,3207.5,,Delayed,2026-09-08,68.5,83.5,69.5,2229.21,76.98,Severe Delays,13.7,20,5
+PRJ-2026-012,City Bus Terminal,Healthcare,West Bengal,Municipal Corporation,2023-06-11,2027-07-20,2023-06-29,3443.25,3976.95,Critical,2026-09-08,70.15,83.85,72.15,2484.3,92.97,Good Progress,7.01,10,6
+PRJ-2026-013,Solar Pump Irrigation,Education,Karnataka,Urban Development Authority,2023-07-28,2026-06-12,2023-09-02,3679.0,,On Track,2026-09-08,71.8,76.2,68.8,2531.15,44.15,Satisfactory,7.9,11,0
+PRJ-2026-014,Municipal Housing Scheme,Urban Development,Tamil Nadu,Rail Development Corporation,2023-09-13,2026-10-27,2023-11-06,3914.75,4325.8,At Risk,2026-09-08,73.45,76.55,71.45,2797.09,58.72,Slow Mobilization,8.81,12,1
+PRJ-2026-015,Bridge Rehabilitation,Roads,Odisha,State Water Board,2023-10-30,2027-03-13,2024-01-10,4150.5,,Delayed,2026-09-08,75.1,76.9,74.1,3075.52,74.71,Severe Delays,9.76,13,3
+PRJ-2026-016,Waste Processing Facility,Water,Gujarat,State PWD,2023-12-16,2027-07-28,2023-12-16,4386.25,4386.25,Critical,2026-09-08,56.75,77.25,56.75,2489.2,92.11,Good Progress,7.95,14,4
+PRJ-2026-017,Smart Street Lighting,Energy,Rajasthan,Municipal Corporation,2024-02-01,2027-12-12,2024-02-19,4622.0,,On Track,2026-09-08,58.4,69.6,59.4,2745.47,110.93,Satisfactory,8.76,15,4
+PRJ-2026-018,Airport Road Upgrade,Railways,Telangana,Urban Development Authority,2024-03-19,2028-04-27,2024-04-24,4857.75,5367.81,At Risk,2026-09-08,60.05,69.95,62.05,3014.23,131.16,Slow Mobilization,9.61,16,5
+PRJ-2026-019,Community Health Center,Healthcare,Kerala,Rail Development Corporation,2024-05-05,2027-03-21,2024-06-28,5093.5,,Delayed,2026-09-08,61.7,70.3,58.7,2989.88,61.12,Severe Delays,10.49,17,1
+PRJ-2026-020,Water Pipeline Network,Education,Bihar,State Water Board,2024-06-21,2027-08-05,2024-09-01,5329.25,6155.28,Critical,2026-09-08,63.35,70.65,61.35,3269.49,79.94,Good Progress,11.4,18,2
+PRJ-2026-021,Logistics Hub Development,Urban Development,Maharashtra,State PWD,2024-08-07,2027-12-20,2024-08-07,5565.0,,On Track,2026-09-08,45.0,63.0,44.0,2448.6,100.17,Satisfactory,8.55,19,2
+PRJ-2026-022,School Infrastructure Upgrade,Roads,West Bengal,Municipal Corporation,2024-09-23,2028-05-05,2024-10-11,5800.75,5800.75,At Risk,2026-09-08,46.65,63.35,46.65,2706.05,121.82,Slow Mobilization,9.33,20,3
+PRJ-2026-023,Lake Restoration Project,Water,Karnataka,Urban Development Authority,2024-11-09,2028-09-19,2024-12-15,6036.5,,Delayed,2026-09-08,48.3,63.7,49.3,2975.99,144.88,Severe Delays,4.83,10,5
+PRJ-2026-024,Electric Bus Depot,Energy,Tamil Nadu,Rail Development Corporation,2024-12-26,2029-02-03,2025-02-18,6272.25,7244.45,Critical,2026-09-08,49.95,64.05,51.95,3258.43,169.35,Good Progress,5.49,11,6
+PRJ-2026-025,Industrial Training Center,Railways,Odisha,State Water Board,2025-02-11,2027-12-28,2025-04-24,6508.0,,On Track,2026-09-08,51.6,56.4,48.6,3162.89,78.1,Satisfactory,6.19,12,0
+PRJ-2026-026,Coastal Protection Works,Healthcare,Gujarat,State PWD,2025-03-30,2028-05-13,2025-03-30,6743.75,7451.84,At Risk,2026-09-08,33.25,56.75,31.25,2107.42,101.16,Slow Mobilization,4.32,13,1
+PRJ-2026-027,Village Connectivity Road,Education,Rajasthan,Municipal Corporation,2025-05-16,2028-09-27,2025-06-03,6979.5,,Delayed,2026-09-08,34.9,57.1,33.9,2366.05,125.63,Severe Delays,4.89,14,3
+PRJ-2026-028,Sewage Treatment Plant,Urban Development,Telangana,Urban Development Authority,2025-07-02,2029-02-11,2025-08-07,7215.25,7215.25,Critical,2026-09-08,36.55,57.45,36.55,2637.17,151.52,Good Progress,5.48,15,4
+PRJ-2026-029,Public Market Redevelopment,Roads,Kerala,Rail Development Corporation,2025-08-18,2029-06-28,2025-10-11,7451.0,,On Track,2026-09-08,38.2,49.8,39.2,2920.79,178.82,Satisfactory,6.11,16,4
+PRJ-2026-030,Renewable Energy Park,Water,Bihar,State Water Board,2025-10-04,2029-11-12,2025-12-15,7686.75,8493.86,At Risk,2026-09-08,39.85,50.15,41.85,3216.9,207.54,Slow Mobilization,6.77,17,5

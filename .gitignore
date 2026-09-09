@@ -1,0 +1,19 @@
+# Environments
+venv/
+env/
+.env
+
+# Cache
+__pycache__/
+*.pyc
+.DS_Store
+
+# Raw Data and Junk
+*.pdf
+2025-26/
+2026-27/
+markdown_output/
+ipynb-junk/
+raw_text.txt
+*clean.md
+*tables_only.md
