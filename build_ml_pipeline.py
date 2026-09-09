@@ -38,7 +38,10 @@ def main():
         try:
             return datetime.strptime(rm, '%B_%Y')
         except:
-            return pd.NaT
+            try:
+                return datetime.strptime(rm, '%B%Y')
+            except:
+                return pd.NaT
             
     df['report_date'] = df['report_month'].apply(parse_report_month)
     
@@ -54,6 +57,15 @@ def main():
     
     # Generate Snapshot ID
     df['snapshot_id'] = df['project_id'].astype(str) + "_" + df['report_month']
+    
+    # Deduplicate snapshots: Keep the row with the most valid (non-null) data
+    df['non_null_count'] = df.notna().sum(axis=1)
+    df = df.sort_values(by=['snapshot_id', 'non_null_count'])
+    df = df.drop_duplicates(subset=['snapshot_id'], keep='last')
+    df = df.drop(columns=['non_null_count'])
+    
+    # Sort chronologically again just to be safe
+    df = df.sort_values(by=['project_id', 'report_date'])
     
     # 2. Canonical Projects
     # We want one row per project to represent the "static" or final state for historical outcome

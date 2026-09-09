@@ -170,7 +170,21 @@ async def predict_overrun_risk(request: ProjectInferenceRequest):
             feature_impacts = list(zip(feature_names, class_1_shap))
             feature_impacts.sort(key=lambda x: abs(x[1]), reverse=True)
             
-            for fname, shap_val in feature_impacts[:3]:
+            filtered_impacts = []
+            for fname, shap_val in feature_impacts:
+                try:
+                    f_idx = list(feature_names).index(fname)
+                    f_val = transformed_data[0][f_idx]
+                except ValueError:
+                    f_val = None
+                
+                # Filter out One-Hot Encoded features that the project does NOT possess
+                if fname.startswith('cat__') and f_val == 0.0:
+                    continue
+                    
+                filtered_impacts.append((fname, shap_val))
+            
+            for fname, shap_val in filtered_impacts[:5]:
                 original_feature_name = fname.split('__')[-1] if '__' in fname else fname
                 direction = "Increases Risk" if shap_val > 0 else "Decreases Risk"
                 
@@ -196,11 +210,14 @@ async def predict_overrun_risk(request: ProjectInferenceRequest):
         
     # 4. Generate LLM AI Overview
     project_name = str(df_proj.iloc[0].get('project_name', f'Project {project_id}'))
+    planned_start_date = str(df_proj.iloc[0].get('planned_start_date', ''))
+    
     ai_overview = generate_ai_overview(project_name, timeline)
     
     return PredictionResponse(
         project_id=project_id,
         project_name=project_name,
+        planned_start_date=planned_start_date,
         risk_probability=float(probability),
         risk_level=risk_level,
         top_factors=explanations,

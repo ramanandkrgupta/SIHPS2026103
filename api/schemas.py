@@ -20,6 +20,7 @@ class HistoricalSnapshot(BaseModel):
 class PredictionResponse(BaseModel):
     project_id: int
     project_name: str
+    planned_start_date: Optional[str] = Field(None, description="Project Date of Approval/Commissioning")
     risk_probability: float = Field(..., description="Probability of cost overrun (0.0 to 1.0)")
     risk_level: str = Field(..., description="Categorical risk level (Low, Medium, High)")
     top_factors: List[FeatureExplanation] = Field(..., description="Top contributing factors to the risk score")
