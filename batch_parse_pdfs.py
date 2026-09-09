@@ -79,29 +79,44 @@ def parse_pdf(pdf_path):
                 project_name = " ".join(project_name_parts).strip()
                 
                 try:
-                    state = lines[i+1]
+                    # Gather state dynamically
+                    state_parts = []
+                    k = i + 1
+                    while k < len(lines):
+                        if re.match(r'^(NA|-|\(-\)|\d{2}/\d{4}|\(\d{2}/\d{4}\))$', lines[k].strip()):
+                            break
+                        state_parts.append(lines[k])
+                        k += 1
+                    state = " ".join(state_parts).strip()
+                    
+                    # Gather dates (usually 4 items)
+                    dates = []
+                    while k < len(lines) and len(dates) < 4:
+                        if not re.match(r'^(NA|-|\(-\)|\d{2}/\d{4}|\(\d{2}/\d{4}\))$', lines[k].strip()):
+                            break
+                        dates.append(lines[k].strip('()'))
+                        k += 1
+                        
+                    planned_start_1 = dates[0] if len(dates) > 0 else ""
+                    planned_start_2 = dates[1] if len(dates) > 1 else ""
+                    planned_comp_1 = dates[2] if len(dates) > 2 else ""
+                    planned_comp_2 = dates[3] if len(dates) > 3 else ""
+                    
+                    # Gather costs and progress
+                    original_cost = lines[k] if k < len(lines) else "0"
+                    k += 1
+                    revised_cost = lines[k] if k < len(lines) else "0"
+                    k += 1
+                    expenditure = lines[k] if k < len(lines) else "0"
+                    k += 1
                     
                     if current_section == "Completed":
-                        # Completed has fewer lines
-                        planned_start_1 = lines[i+2]
-                        planned_start_2 = lines[i+3].strip('()')
-                        planned_comp_1 = lines[i+4]
-                        planned_comp_2 = lines[i+5].strip('()')
-                        original_cost = lines[i+6]
-                        revised_cost = lines[i+7].strip('()')
-                        expenditure = lines[i+8]
-                        physical_progress = "100" # It's completed
-                        skip_lines = 9
+                        physical_progress = "100"
                     else:
-                        planned_start_1 = lines[i+2]
-                        planned_start_2 = lines[i+3].strip('()')
-                        planned_comp_1 = lines[i+4]
-                        planned_comp_2 = lines[i+5].strip('()')
-                        original_cost = lines[i+6]
-                        revised_cost = lines[i+7].strip('()')
-                        expenditure = lines[i+8]
-                        physical_progress = lines[i+9]
-                        skip_lines = 10
+                        physical_progress = lines[k] if k < len(lines) else "0"
+                        k += 1
+                        
+                    skip_lines = k - i
                     
                     planned_start = planned_start_2 if planned_start_2 and planned_start_2 != '-' else planned_start_1
                     planned_comp = planned_comp_1 if planned_comp_1 and planned_comp_1 != '-' else planned_comp_2
