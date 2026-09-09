@@ -27,12 +27,16 @@ if genai and GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
 # Global variables
 ml_pipeline = None
 explainer = None
-DB_PATH = "paimana.db"
+import pathlib
+
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+
+DB_PATH = str(BASE_DIR / "paimana.db")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global ml_pipeline, explainer
-    model_path = "output/models/best_classification_pipeline.pkl"
+    model_path = str(BASE_DIR / "output/models/best_classification_pipeline.pkl")
     if os.path.exists(model_path):
         print(f"Loading ML pipeline from {model_path}...")
         ml_pipeline = joblib.load(model_path)

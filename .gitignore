@@ -17,3 +17,5 @@ ipynb-junk/
 raw_text.txt
 *clean.md
 *tables_only.md
+.vercel
+.env*
