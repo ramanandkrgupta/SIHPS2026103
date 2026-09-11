@@ -566,7 +566,7 @@ def get_benchmark_df():
     query = """
     SELECT 
         p.project_id, p.project_name, p.state, p.implementing_agency, p.sector, p.approved_cost,
-        e.predicted_cost_cr, e.predicted_delay_months, e.risk_level, e.has_cost_overrun, e.has_time_delay,
+        e.predicted_cost_cr, e.predicted_delay_months, e.risk_level, e.risk_probability, e.has_cost_overrun, e.has_time_delay,
         (SELECT physical_progress FROM project_snapshots WHERE project_id = p.project_id ORDER BY report_date DESC LIMIT 1) as physical_progress,
         (SELECT financial_progress FROM project_snapshots WHERE project_id = p.project_id ORDER BY report_date DESC LIMIT 1) as financial_progress
     FROM projects p
@@ -637,13 +637,193 @@ async def get_analytics_overview():
         'cost_overrun_pct': 'mean'
     }).reset_index().rename(columns={'project_id': 'total_projects'}).sort_values('total_projects', ascending=False).head(10)
     
+    # Sector Risk Breakdown (join with projects to get sector)
+    conn = sqlite3.connect(DB_PATH)
+    sector_df = pd.read_sql_query("""
+        SELECT p.sector, COUNT(e.project_id) as total_projects,
+               SUM(e.has_cost_overrun) as cost_overruns,
+               AVG(e.risk_probability)*100 as avg_risk_score,
+               SUM(p.approved_cost) as total_cost
+        FROM early_warnings e
+        LEFT JOIN projects p ON e.project_id = p.project_id
+        WHERE p.sector IS NOT NULL
+        GROUP BY p.sector
+        ORDER BY total_projects DESC
+    """, conn)
+    conn.close()
+    
+    sector_breakdown = sector_df.rename(columns={
+        'sector': 'sector',
+        'total_projects': 'project_count',
+        'cost_overruns': 'high_risk_count',
+        'avg_risk_score': 'avg_risk',
+        'total_cost': 'total_cost'
+    }).to_dict('records')
+    
+    # Risk counts and avg score
+    high_risk_count = int(len(df[df['risk_level'] == 'High']))
+    medium_risk_count = int(len(df[df['risk_level'] == 'Medium']))
+    low_risk_count = int(len(df[df['risk_level'] == 'Low']))
+    avg_risk_score = float(df['risk_probability'].mean() * 100) if len(df) > 0 else 0
+    
+    # Monthly Risk Trends — join snapshots with early warnings for per-month stats
+    conn3 = sqlite3.connect(DB_PATH)
+    trends_df = pd.read_sql_query("""
+        SELECT 
+            ps.report_month,
+            COUNT(DISTINCT ps.project_id) as total_projects,
+            SUM(CASE WHEN e.risk_level='High' THEN 1 ELSE 0 END) as high_risk_projects,
+            AVG(e.risk_probability)*100 as avg_risk_score,
+            SUM(CASE WHEN e.has_cost_overrun=1 THEN 1 ELSE 0 END) as cost_escalation_risk,
+            SUM(CASE WHEN e.has_time_delay=1 THEN 1 ELSE 0 END) as schedule_delay_risk
+        FROM project_snapshots ps
+        LEFT JOIN early_warnings e ON ps.project_id = e.project_id
+        GROUP BY ps.report_month
+        ORDER BY ps.report_month
+    """, conn3)
+    
+    # Count overdue projects (planned completion in the past)
+    overdue_result = conn3.execute("""
+        SELECT COUNT(*) FROM projects p
+        JOIN early_warnings e ON p.project_id = e.project_id
+        WHERE p.planned_completion_date IS NOT NULL 
+          AND p.planned_completion_date != ''
+          AND p.planned_completion_date < '2026-09-01'
+    """).fetchone()
+    total_overdue = int(overdue_result[0]) if overdue_result else 0
+    conn3.close()
+    
+    # Sort and label months correctly
+    month_order = {
+        'July_2025': 0, 'August_2025': 1, 'September_2025': 2, 'October_2025': 3,
+        'November_2025': 4, 'December_2025': 5, 'January_2026': 6, 'February_2026': 7,
+        'March_2026': 8, 'April2026': 9, 'May2026': 10, 'June_2026': 11, 'July_2026': 12
+    }
+    month_labels = {
+        'July_2025': 'Jul 25', 'August_2025': 'Aug 25', 'September_2025': 'Sep 25',
+        'October_2025': 'Oct 25', 'November_2025': 'Nov 25', 'December_2025': 'Dec 25',
+        'January_2026': 'Jan 26', 'February_2026': 'Feb 26', 'March_2026': 'Mar 26',
+        'April2026': 'Apr 26', 'May2026': 'May 26', 'June_2026': 'Jun 26', 'July_2026': 'Jul 26'
+    }
+    
+    trends_df['sort_order'] = trends_df['report_month'].map(lambda x: month_order.get(x, 99))
+    trends_df = trends_df.sort_values('sort_order')
+    trends_df['month_label'] = trends_df['report_month'].map(lambda x: month_labels.get(x, x))
+    
+    risk_trends = []
+    for _, row in trends_df.iterrows():
+        risk_trends.append({
+            'month': row['month_label'],
+            'report_month': row['report_month'],
+            'high_risk_projects': int(row['high_risk_projects'] or 0),
+            'avg_risk_score': round(float(row['avg_risk_score'] or 0), 1),
+            'cost_escalation_risk': int(row['cost_escalation_risk'] or 0),
+            'schedule_delay_risk': int(row['schedule_delay_risk'] or 0),
+        })
+    
+    # Progress Divergence Projects - financial progress much higher than physical
+    conn4 = sqlite3.connect(DB_PATH)
+    divergence_df = pd.read_sql_query("""
+        SELECT e.project_id, p.project_name, p.sector,
+               ps_latest.financial_progress, ps_latest.physical_progress,
+               ROUND(ps_latest.financial_progress - ps_latest.physical_progress, 2) as gap,
+               ROUND(e.risk_probability*100, 1) as risk_score,
+               e.risk_level, e.risk_probability,
+               e.has_cost_overrun, e.has_time_delay
+        FROM early_warnings e
+        JOIN projects p ON e.project_id = p.project_id
+        JOIN (
+          SELECT project_id, financial_progress, physical_progress
+          FROM project_snapshots
+          WHERE (project_id, report_date) IN (
+            SELECT project_id, MAX(report_date) FROM project_snapshots GROUP BY project_id
+          )
+        ) ps_latest ON ps_latest.project_id = e.project_id
+        WHERE ps_latest.financial_progress IS NOT NULL
+          AND ps_latest.physical_progress IS NOT NULL
+          AND (ps_latest.financial_progress - ps_latest.physical_progress) > 12
+        ORDER BY gap DESC
+        LIMIT 6
+    """, conn4)
+    
+    # Top high risk projects with full metrics
+    top_risk_df = pd.read_sql_query("""
+        SELECT e.project_id, p.project_name, p.sector, p.state, p.implementing_agency,
+               p.approved_cost,
+               e.predicted_cost_cr, e.risk_probability, e.risk_level, e.has_cost_overrun, e.has_time_delay,
+               ps_latest.physical_progress, ps_latest.financial_progress
+        FROM early_warnings e
+        JOIN projects p ON e.project_id = p.project_id
+        LEFT JOIN (
+          SELECT project_id, financial_progress, physical_progress
+          FROM project_snapshots
+          WHERE (project_id, report_date) IN (
+            SELECT project_id, MAX(report_date) FROM project_snapshots GROUP BY project_id
+          )
+        ) ps_latest ON ps_latest.project_id = e.project_id
+        WHERE e.risk_level = 'High'
+        ORDER BY e.risk_probability DESC
+        LIMIT 10
+    """, conn4)
+    conn4.close()
+    
+    divergence_projects = []
+    for _, row in divergence_df.iterrows():
+        risk_lv = row['risk_level']
+        divergence_projects.append({
+            'id': str(int(row['project_id'])),
+            'project_id': int(row['project_id']),
+            'project_name': row['project_name'],
+            'project_code': f"PRJ-{int(row['project_id'])}",
+            'sector': row['sector'] or 'Infrastructure',
+            'financial_progress': round(float(row['financial_progress']), 2),
+            'physical_progress': round(float(row['physical_progress']), 2),
+            'progress_gap': round(float(row['gap']), 2),
+            'risk_score': round(float(row['risk_score']), 1),
+            'risk_level': 'HIGH' if risk_lv == 'High' else ('MEDIUM' if risk_lv == 'Medium' else 'LOW'),
+        })
+    
+    top_high_risk_projects = []
+    for _, row in top_risk_df.iterrows():
+        risk_lv = row['risk_level']
+        prob = float(row['risk_probability'])
+        phys = float(row['physical_progress']) if row['physical_progress'] is not None else 0
+        fin = float(row['financial_progress']) if row['financial_progress'] is not None else 0
+        orig_cost = float(row['approved_cost']) if row['approved_cost'] else 0
+        rev_cost = float(row['predicted_cost_cr']) if row['predicted_cost_cr'] else orig_cost
+        top_high_risk_projects.append({
+            'id': str(int(row['project_id'])),
+            'project_name': row['project_name'],
+            'project_code': f"PRJ-{int(row['project_id'])}",
+            'sector': row['sector'] or 'Infrastructure',
+            'state': (row['state'] or 'National').replace('(-) (-) ', ''),
+            'implementing_agency': row['implementing_agency'] or 'N/A',
+            'original_cost': orig_cost,
+            'revised_cost': rev_cost,
+            'expenditure': 0,
+            'physical_progress': round(phys, 2),
+            'financial_progress': round(fin, 2),
+            'delay_probability': round(prob * 100, 1) if row['has_time_delay'] else round(prob * 80, 1),
+            'cost_overrun_probability': round(prob * 100, 1) if row['has_cost_overrun'] else round(prob * 60, 1),
+            'risk_score': round(prob * 100, 1),
+            'risk_level': 'HIGH' if risk_lv == 'High' else ('MEDIUM' if risk_lv == 'Medium' else 'LOW'),
+        })
+    
     return AnalyticsOverview(
         total_projects=len(df),
-        total_high_risk=len(df[df['risk_level'] == 'High']),
-        total_cost_overrun=df['has_cost_overrun'].sum(),
-        total_time_delayed=df['has_time_delay'].sum(),
+        total_high_risk=high_risk_count,
+        total_medium_risk=medium_risk_count,
+        total_low_risk=low_risk_count,
+        total_cost_overrun=int(df['has_cost_overrun'].sum()),
+        total_time_delayed=int(df['has_time_delay'].sum()),
+        total_overdue=total_overdue,
         agency_breakdown=agency_group.to_dict('records'),
-        state_breakdown=state_group.to_dict('records')
+        state_breakdown=state_group.to_dict('records'),
+        sector_risk_breakdown=sector_breakdown,
+        avg_risk_score=round(avg_risk_score, 1),
+        risk_trends=risk_trends,
+        progress_divergence_projects=divergence_projects,
+        top_high_risk_projects=top_high_risk_projects
     )
 
 from api.schemas import CostDriverAnalysisResponse

@@ -105,10 +105,18 @@ class ProjectBenchmarkResponse(BaseModel):
 class AnalyticsOverview(BaseModel):
     total_projects: int
     total_high_risk: int
+    total_medium_risk: int
+    total_low_risk: int
     total_cost_overrun: int
     total_time_delayed: int
+    total_overdue: int
     agency_breakdown: List[dict]
     state_breakdown: List[dict]
+    sector_risk_breakdown: List[dict]
+    avg_risk_score: float
+    risk_trends: List[dict]
+    progress_divergence_projects: List[dict]
+    top_high_risk_projects: List[dict]
 
 class CostDriverItem(BaseModel):
     driver_key: str
