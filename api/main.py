@@ -422,6 +422,64 @@ async def predict_overrun_risk(request: ProjectInferenceRequest):
         ai_overview=ai_overview
     )
 
+from api.schemas import EarlyWarningItem, EarlyWarningResponse
+from typing import Optional
+
+@app.get("/api/v1/early-warnings", response_model=EarlyWarningResponse)
+async def get_early_warnings(
+    risk_level: Optional[str] = None,
+    has_cost_overrun: Optional[bool] = None,
+    has_time_delay: Optional[bool] = None,
+    page: int = 1,
+    limit: int = 50
+):
+    conn = sqlite3.connect(DB_PATH)
+    query = "SELECT * FROM early_warnings WHERE 1=1"
+    params = []
+    
+    if risk_level:
+        query += " AND risk_level = ?"
+        params.append(risk_level)
+    if has_cost_overrun is not None:
+        query += " AND has_cost_overrun = ?"
+        params.append(int(has_cost_overrun))
+    if has_time_delay is not None:
+        query += " AND has_time_delay = ?"
+        params.append(int(has_time_delay))
+        
+    # Count total
+    count_query = query.replace("SELECT *", "SELECT COUNT(*)")
+    total_count = conn.execute(count_query, params).fetchone()[0]
+    
+    # Pagination
+    offset = (page - 1) * limit
+    query += " ORDER BY risk_probability DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    
+    df = pd.read_sql_query(query, conn, params=params)
+    conn.close()
+    
+    warnings = []
+    for _, row in df.iterrows():
+        warnings.append(EarlyWarningItem(
+            project_id=row['project_id'],
+            project_name=row['project_name'],
+            risk_level=row['risk_level'],
+            risk_probability=row['risk_probability'],
+            predicted_delay_months=row['predicted_delay_months'],
+            predicted_cost_cr=row['predicted_cost_cr'],
+            has_cost_overrun=bool(row['has_cost_overrun']),
+            has_time_delay=bool(row['has_time_delay']),
+            last_updated=row['last_updated']
+        ))
+        
+    return EarlyWarningResponse(
+        total_count=total_count,
+        page=page,
+        limit=limit,
+        warnings=warnings
+    )
+
 @app.get("/health")
 async def health_check():
     return {

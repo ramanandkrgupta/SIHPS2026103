@@ -58,3 +58,20 @@ class TimeOverrunResponse(BaseModel):
     predicted_total_duration: float
     risk_level: str = Field(..., description="Categorical risk level (Low, Medium, High)")
     top_delay_factors: List[DelayFactor] = Field(..., description="SHAP explanation of top features contributing to delay")
+
+class EarlyWarningItem(BaseModel):
+    project_id: int
+    project_name: str
+    risk_level: str
+    risk_probability: float
+    predicted_delay_months: float
+    predicted_cost_cr: float
+    has_cost_overrun: bool
+    has_time_delay: bool
+    last_updated: str
+
+class EarlyWarningResponse(BaseModel):
+    total_count: int
+    page: int
+    limit: int
+    warnings: List[EarlyWarningItem]
