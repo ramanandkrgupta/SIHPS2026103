@@ -30,6 +30,7 @@ ml_pipeline = None
 explainer = None
 lstm_model = None
 ts_scaler = None
+time_overrun_model = None
 
 import pathlib
 import sys
@@ -43,7 +44,7 @@ DB_PATH = str(BASE_DIR / "paimana.db")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ml_pipeline, explainer, lstm_model, ts_scaler
+    global ml_pipeline, explainer, lstm_model, ts_scaler, time_overrun_model
     model_path = str(BASE_DIR / "output/models/best_classification_pipeline.pkl")
     if os.path.exists(model_path):
         print(f"Loading ML pipeline from {model_path}...")
@@ -77,11 +78,24 @@ async def lifespan(app: FastAPI):
     else:
         print("Warning: LSTM model or scaler files not found.")
         
+    # Load Time Overrun Model
+    to_model_path = str(BASE_DIR / "output/models/time_overrun_gb.pkl")
+    if os.path.exists(to_model_path):
+        try:
+            print(f"Loading Time Overrun model from {to_model_path}...")
+            time_overrun_model = joblib.load(to_model_path)
+            print("Time Overrun model loaded.")
+        except Exception as e:
+            print(f"Warning: Could not initialize Time Overrun model: {e}")
+    else:
+        print(f"Warning: Time Overrun model {to_model_path} not found.")
+        
     yield
     ml_pipeline = None
     explainer = None
     lstm_model = None
     ts_scaler = None
+    time_overrun_model = None
 
 app = FastAPI(
     title="PAIMANA AI Project Intelligence API",
@@ -143,7 +157,66 @@ def generate_ai_overview(project_name: str, snapshots: list) -> str:
     except Exception as e:
         return f"Warning: LLM generation failed: {e}"
 
-from api.schemas import CostForecastResponse, HistoricalBacktest, FutureForecast
+from api.schemas import CostForecastResponse, HistoricalBacktest, FutureForecast, TimeOverrunResponse, DelayFactor
+
+@app.post("/api/v1/predict/time-overrun", response_model=TimeOverrunResponse)
+async def predict_time_overrun(request: ProjectInferenceRequest):
+    if time_overrun_model is None:
+        raise HTTPException(status_code=503, detail="Time Overrun model is not loaded.")
+        
+    project_id = request.project_id
+    df_proj, df_snaps = fetch_project_history(project_id)
+    
+    if df_proj is None or df_snaps.empty:
+        raise HTTPException(status_code=404, detail=f"Project ID {project_id} not found in database.")
+        
+    # Get latest snapshot to evaluate current delay
+    latest_snapshot = df_snaps.iloc[-1].copy()
+    features = [
+        'sector', 'planned_duration_months', 'physical_progress', 'planned_progress',
+        'financial_progress', 'expenditure_ratio', 'milestones_completed',
+        'milestones_total', 'milestones_overdue'
+    ]
+    
+    input_data = pd.DataFrame([{f: latest_snapshot.get(f, 0) for f in features}])
+    input_data = input_data.fillna(0)
+    
+    # Predict
+    predicted_delay = float(time_overrun_model.predict(input_data)[0])
+    predicted_delay = max(0.0, round(predicted_delay, 1))
+    
+    planned_duration = float(input_data['planned_duration_months'].values[0])
+    total_duration = planned_duration + predicted_delay
+    
+    # Explainability (SHAP TreeExplainer for Gradient Boosting)
+    impacts = []
+    try:
+        to_explainer = shap.TreeExplainer(time_overrun_model)
+        shap_values = to_explainer.shap_values(input_data)
+        
+        for i, col in enumerate(features):
+            impacts.append(DelayFactor(
+                feature=col,
+                value=float(input_data[col].values[0]),
+                impact=round(float(shap_values[0][i]), 2)
+            ))
+            
+        impacts.sort(key=lambda x: abs(x.impact), reverse=True)
+    except Exception as e:
+        print(f"Warning: SHAP for Time Overrun failed: {e}")
+    
+    risk_level = "High" if predicted_delay > 6 else "Medium" if predicted_delay > 2 else "Low"
+    project_name = str(df_proj.iloc[0].get('project_name', f'Project {project_id}'))
+    
+    return TimeOverrunResponse(
+        project_id=project_id,
+        project_name=project_name,
+        planned_duration_months=int(planned_duration),
+        predicted_delay_months=predicted_delay,
+        predicted_total_duration=total_duration,
+        risk_level=risk_level,
+        top_delay_factors=impacts[:3]
+    )
 
 @app.post("/api/v1/predict/cost-overrun", response_model=CostForecastResponse)
 async def predict_cost_overrun(request: ProjectInferenceRequest):

@@ -44,3 +44,17 @@ class CostForecastResponse(BaseModel):
     historical_backtest: List[HistoricalBacktest] = Field(..., description="Actual vs Predicted costs for historical data")
     future_forecast: List[FutureForecast] = Field(..., description="LSTM 3-month forecast")
     ai_explanation: str = Field(..., description="SHAP-driven explanation of the forecast")
+
+class DelayFactor(BaseModel):
+    feature: str
+    value: float
+    impact: float = Field(..., description="Impact in months of delay")
+
+class TimeOverrunResponse(BaseModel):
+    project_id: int
+    project_name: str
+    planned_duration_months: int
+    predicted_delay_months: float
+    predicted_total_duration: float
+    risk_level: str = Field(..., description="Categorical risk level (Low, Medium, High)")
+    top_delay_factors: List[DelayFactor] = Field(..., description="SHAP explanation of top features contributing to delay")
