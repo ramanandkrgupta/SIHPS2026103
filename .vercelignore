@@ -5,6 +5,7 @@ venv/
 *.pdf
 *.csv
 *.md
+*.zip
 ipynb-junk/
 markdown_output/
 scratch/
@@ -19,3 +20,8 @@ notebook_code.py
 parse_to_csv.py
 seed_db.py
 output/canonical_*.csv
+temp_workspace/
+Project_Sentinel-main/
+project-sentinel-ai/
+frontend/node_modules/
+api/__pycache__/
