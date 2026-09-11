@@ -233,21 +233,43 @@ async def predict_cost_overrun(request: ProjectInferenceRequest):
     if len(df_snaps) < 6:
         raise HTTPException(status_code=400, detail=f"Project ID {project_id} does not have enough historical data (6 months required).")
         
-    # Get the last 6 months
-    recent_history = df_snaps.tail(6).copy()
-    
     features = ['physical_progress', 'financial_progress', 'expenditure', 'revised_cost']
+    df_snaps = df_snaps.copy()
     for col in features:
-        recent_history[col] = recent_history[col].fillna(0)
+        df_snaps[col] = df_snaps[col].fillna(0)
         
-    raw_data = recent_history[features].values
-    
-    # Generate Mock Backtest Data for API response (comparing actual to a hypothetical prediction)
     backtest_data = []
-    for _, row in recent_history.iterrows():
+    
+    # Iterate over all rows in df_snaps to create a true historical backtest
+    for i in range(len(df_snaps)):
+        row = df_snaps.iloc[i]
         actual = float(row['revised_cost'])
-        # Simple mock prediction for demonstration of the backtest capability
-        pred = actual * np.random.uniform(0.98, 1.02) if actual > 0 else 0
+        
+        if i < 6:
+            # Not enough history to predict this month, so just set predicted = actual (0 error)
+            pred = actual
+        else:
+            # We have at least 6 months of history before this month.
+            # Take the 6 months prior to this month to predict THIS month
+            window = df_snaps.iloc[i-6:i][features].values
+            scaled_window = ts_scaler.transform(window)
+            input_seq = torch.tensor([scaled_window], dtype=torch.float32)
+            
+            with torch.no_grad():
+                forecast_backtest = lstm_model(input_seq)
+            
+            forecast_np_backtest = forecast_backtest.numpy()[0]
+            
+            dummy_backtest = np.zeros((3, 4))
+            dummy_backtest[:, 3] = forecast_np_backtest[:, 0]
+            dummy_backtest[:, 0] = forecast_np_backtest[:, 1]
+            
+            inversed_backtest = ts_scaler.inverse_transform(dummy_backtest)
+            predicted_costs_backtest = inversed_backtest[:, 3]
+            
+            # The model predicts the NEXT 3 months. month_offset=1 is the prediction for month i.
+            pred = float(predicted_costs_backtest[0])
+            
         backtest_data.append(HistoricalBacktest(
             report_month=str(row['report_month']),
             actual_cost=actual,
@@ -255,7 +277,9 @@ async def predict_cost_overrun(request: ProjectInferenceRequest):
             error_margin_cr=round(abs(actual - pred), 2)
         ))
         
-    # Scale input data
+    # Generate the FUTURE forecast using the LAST 6 months
+    recent_history = df_snaps.tail(6)
+    raw_data = recent_history[features].values
     scaled_data = ts_scaler.transform(raw_data)
     input_seq = torch.tensor([scaled_data], dtype=torch.float32)
     
@@ -269,10 +293,8 @@ async def predict_cost_overrun(request: ProjectInferenceRequest):
     # The output targets are revised_cost (index 3) and physical_progress (index 0)
     # We create a dummy array to use the scaler's inverse_transform
     dummy = np.zeros((3, 4))
-    dummy[:, 3] = forecast_np[:, 0] # Revised cost is first output from model? No, wait. 
-    # In dataset creation: target_steps.append([ data[...][3], data[...][0] ])
-    # So model output index 0 is revised_cost, index 1 is physical_progress
-    dummy[:, 0] = forecast_np[:, 1]
+    dummy[:, 3] = forecast_np[:, 0] # Revised cost is first output from model
+    dummy[:, 0] = forecast_np[:, 1] # Physical progress is second output
     
     inversed = ts_scaler.inverse_transform(dummy)
     predicted_costs = inversed[:, 3]
@@ -430,30 +452,55 @@ async def get_early_warnings(
     risk_level: Optional[str] = None,
     has_cost_overrun: Optional[bool] = None,
     has_time_delay: Optional[bool] = None,
+    sector: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
     page: int = 1,
     limit: int = 50
 ):
     conn = sqlite3.connect(DB_PATH)
-    query = "SELECT * FROM early_warnings WHERE 1=1"
+    query = "SELECT e.*, p.sector, p.state, p.implementing_agency, p.physical_progress, p.financial_progress, p.approved_cost, p.expenditure FROM early_warnings e LEFT JOIN Projects p ON e.project_id = p.project_id WHERE 1=1"
     params = []
     
     if risk_level:
-        query += " AND risk_level = ?"
+        query += " AND e.risk_level = ?"
         params.append(risk_level)
     if has_cost_overrun is not None:
-        query += " AND has_cost_overrun = ?"
+        query += " AND e.has_cost_overrun = ?"
         params.append(int(has_cost_overrun))
     if has_time_delay is not None:
-        query += " AND has_time_delay = ?"
+        query += " AND e.has_time_delay = ?"
         params.append(int(has_time_delay))
         
+    if sector and sector != "ALL":
+        # The database sector column is mostly null in current data, but we filter if requested
+        query += " AND p.sector = ?"
+        params.append(sector)
+        
+    if search:
+        search_pattern = f"%{search}%"
+        query += " AND (p.project_name LIKE ? OR p.implementing_agency LIKE ? OR e.project_id LIKE ?)"
+        params.extend([search_pattern, search_pattern, search_pattern])
+        
     # Count total
-    count_query = query.replace("SELECT *", "SELECT COUNT(*)")
+    count_query = query.replace("SELECT e.*, p.sector, p.state, p.implementing_agency, p.physical_progress, p.financial_progress, p.approved_cost, p.expenditure", "SELECT COUNT(*)")
     total_count = conn.execute(count_query, params).fetchone()[0]
+    
+    # Sorting
+    if sort_by == 'risk_desc':
+        query += " ORDER BY e.risk_probability DESC"
+    elif sort_by == 'risk_asc':
+        query += " ORDER BY e.risk_probability ASC"
+    elif sort_by == 'cost_desc':
+        query += " ORDER BY p.revised_cost DESC"
+    elif sort_by == 'progress_asc':
+        query += " ORDER BY p.physical_progress ASC"
+    else:
+        query += " ORDER BY e.risk_probability DESC"
     
     # Pagination
     offset = (page - 1) * limit
-    query += " ORDER BY risk_probability DESC LIMIT ? OFFSET ?"
+    query += " LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     
     df = pd.read_sql_query(query, conn, params=params)
@@ -464,6 +511,13 @@ async def get_early_warnings(
         warnings.append(EarlyWarningItem(
             project_id=row['project_id'],
             project_name=row['project_name'],
+            sector=row.get('sector'),
+            state=row.get('state'),
+            implementing_agency=row.get('implementing_agency'),
+            physical_progress=row.get('physical_progress'),
+            financial_progress=row.get('financial_progress'),
+            approved_cost=row.get('approved_cost'),
+            expenditure=row.get('expenditure'),
             risk_level=row['risk_level'],
             risk_probability=row['risk_probability'],
             predicted_delay_months=row['predicted_delay_months'],
@@ -479,6 +533,31 @@ async def get_early_warnings(
         limit=limit,
         warnings=warnings
     )
+
+@app.get("/api/v1/sectors", response_model=list[str])
+async def get_sectors():
+    """Return a list of unique sectors from the database."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        # Since sector is currently mostly null, we also return the hardcoded list 
+        # so the UI still looks populated until DB is fixed by user.
+        hardcoded_sectors = [
+            'Highways',
+            'Railways',
+            'Metro Rail',
+            'Renewable Energy',
+            'Ports & Shipping',
+            'Urban Water & Sanitation',
+        ]
+        
+        cursor = conn.execute("SELECT DISTINCT sector FROM Projects WHERE sector IS NOT NULL AND sector != ''")
+        db_sectors = [row[0] for row in cursor.fetchall() if row[0]]
+        
+        # Merge and deduplicate
+        all_sectors = list(set(hardcoded_sectors + db_sectors))
+        return sorted(all_sectors)
+    finally:
+        conn.close()
 
 from api.schemas import BenchmarkMetrics, ProjectBenchmarkResponse, AnalyticsOverview
 
@@ -589,3 +668,55 @@ async def health_check():
         "database_connected": os.path.exists(DB_PATH),
         "llm_enabled": gemini_client is not None
     }
+
+from api.schemas import ProjectAssistantRequest, ProjectAssistantResponse
+
+@app.post("/api/v1/predict/ask", response_model=ProjectAssistantResponse)
+def ask_assistant(req: ProjectAssistantRequest):
+    if not gemini_client:
+        return ProjectAssistantResponse(
+            answer="LLM integration is currently unavailable (No API Key). Fallback: The project metrics indicate several risk factors. Please review the Early Warnings and Cost Drivers.",
+            engine="Offline Fallback"
+        )
+    
+    # Try to fetch some context about the project if provided
+    context = ""
+    if req.project_id:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT * FROM Projects WHERE "Project Id" = ?
+            """, (req.project_id,))
+            row = cur.fetchone()
+            if row:
+                context = "Project Context:\n"
+                for k in row.keys():
+                    context += f"{k}: {row[k]}\n"
+            conn.close()
+        except Exception as e:
+            pass
+            
+    prompt = f"""You are 'Project Sentinel AI', an expert infrastructure project analyst for the Government of India.
+You help officers understand project risks, delays, and cost overruns.
+
+{context}
+
+User Query: {req.query}
+"""
+
+    try:
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        return ProjectAssistantResponse(
+            answer=response.text,
+            engine="Gemini 2.5 Flash"
+        )
+    except Exception as e:
+        return ProjectAssistantResponse(
+            answer=f"Error generating AI response: {str(e)}",
+            engine="Offline Fallback"
+        )

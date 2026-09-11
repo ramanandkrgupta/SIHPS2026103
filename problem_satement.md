@@ -50,7 +50,7 @@ It is suggested/desirable that the proposed solution may leverage any of the fol
 ### Possible Expected Outcomes and Evaluation
 An indicative solution proposed by the student should comprise of any of the outcomes given below:
 - **a.** Cost Overrun Prediction Model
-- **b.** Time Overrun Prediction Model
+- **b.** Time Overrun Prediction Model 
 - **c.** Project Risk Scoring Framework
 - **d.** Early Warning Alert System
 - **e.** Benchmarking and Comparative Analytics Module

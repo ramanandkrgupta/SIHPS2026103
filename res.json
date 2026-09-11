@@ -1,0 +1,58 @@
+{
+    "project_id": 618087,
+    "project_name": "Widening to intermediate/two lane to 2 lane with paved shoulder from Existing chanages Km 112.750 to 142.00 Liingasur to Mudabal cross & from Km. 147.070 to Km. 149.070 Maski city limit of Jewargi Chamrajnagar setion of NH-150A in the state of Karnataka on EPC mode. Job No. NH-150A-KNT-2021-22-951",
+    "baseline_approved_cost": 255.88,
+    "historical_backtest": [
+        {
+            "report_month": "February_2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 254.13,
+            "error_margin_cr": 1.75
+        },
+        {
+            "report_month": "March_2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 256.64,
+            "error_margin_cr": 0.76
+        },
+        {
+            "report_month": "April2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 253.12,
+            "error_margin_cr": 2.76
+        },
+        {
+            "report_month": "May2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 253.82,
+            "error_margin_cr": 2.06
+        },
+        {
+            "report_month": "June_2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 255.85,
+            "error_margin_cr": 0.03
+        },
+        {
+            "report_month": "July_2026",
+            "actual_cost": 255.88,
+            "predicted_cost": 251.85,
+            "error_margin_cr": 4.03
+        }
+    ],
+    "future_forecast": [
+        {
+            "month_offset": 1,
+            "predicted_cost_cr": 255.88
+        },
+        {
+            "month_offset": 2,
+            "predicted_cost_cr": 255.88
+        },
+        {
+            "month_offset": 3,
+            "predicted_cost_cr": 256.73
+        }
+    ],
+    "ai_explanation": "Forecast based on LSTM sequence analysis. DeepExplainer SHAP integration is pending optimization for API response."
+}%  

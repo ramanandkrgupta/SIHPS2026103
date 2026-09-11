@@ -62,13 +62,20 @@ class TimeOverrunResponse(BaseModel):
 class EarlyWarningItem(BaseModel):
     project_id: int
     project_name: str
+    sector: Optional[str] = None
+    state: Optional[str] = None
+    implementing_agency: Optional[str] = None
+    physical_progress: Optional[float] = None
+    financial_progress: Optional[float] = None
+    approved_cost: Optional[float] = None
+    expenditure: Optional[float] = None
     risk_level: str
     risk_probability: float
     predicted_delay_months: float
     predicted_cost_cr: float
     has_cost_overrun: bool
     has_time_delay: bool
-    last_updated: str
+    last_updated: Optional[str] = None
 
 class EarlyWarningResponse(BaseModel):
     total_count: int
@@ -112,3 +119,11 @@ class CostDriverItem(BaseModel):
 class CostDriverAnalysisResponse(BaseModel):
     macro_stats: dict
     global_drivers: List[CostDriverItem]
+
+class ProjectAssistantRequest(BaseModel):
+    query: str = Field(..., description="The user's chat query")
+    project_id: Optional[int] = Field(None, description="Optional project ID for context")
+
+class ProjectAssistantResponse(BaseModel):
+    answer: str
+    engine: str
