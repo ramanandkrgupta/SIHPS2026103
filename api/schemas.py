@@ -102,3 +102,13 @@ class AnalyticsOverview(BaseModel):
     total_time_delayed: int
     agency_breakdown: List[dict]
     state_breakdown: List[dict]
+
+class CostDriverItem(BaseModel):
+    driver_key: str
+    driver_name: str
+    importance_score: float
+    correlation: str
+
+class CostDriverAnalysisResponse(BaseModel):
+    macro_stats: dict
+    global_drivers: List[CostDriverItem]

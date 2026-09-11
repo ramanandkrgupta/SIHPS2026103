@@ -567,6 +567,20 @@ async def get_analytics_overview():
         state_breakdown=state_group.to_dict('records')
     )
 
+from api.schemas import CostDriverAnalysisResponse
+import json
+
+@app.get("/api/v1/analytics/cost-drivers", response_model=CostDriverAnalysisResponse)
+async def get_global_cost_drivers():
+    driver_path = BASE_DIR / "output" / "data" / "global_cost_drivers.json"
+    if not os.path.exists(driver_path):
+        raise HTTPException(status_code=404, detail="Global driver analysis has not been executed yet.")
+        
+    with open(driver_path, "r") as f:
+        data = json.load(f)
+        
+    return CostDriverAnalysisResponse(**data)
+
 @app.get("/health")
 async def health_check():
     return {
