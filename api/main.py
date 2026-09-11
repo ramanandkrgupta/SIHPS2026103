@@ -149,18 +149,18 @@ async def predict_overrun_risk(request: ProjectInferenceRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
         
-    # 2. Explainability (SHAP)
+    # 2. Explainability (SHAP or Coefficients)
     explanations = []
-    if explainer is not None:
+    try:
+        preprocessor = ml_pipeline.named_steps['preprocessor']
+        transformed_data = preprocessor.transform(input_data)
+        
         try:
-            preprocessor = ml_pipeline.named_steps['preprocessor']
-            transformed_data = preprocessor.transform(input_data)
+            feature_names = preprocessor.get_feature_names_out()
+        except:
+            feature_names = [f"Feature_{i}" for i in range(transformed_data.shape[1])]
             
-            try:
-                feature_names = preprocessor.get_feature_names_out()
-            except:
-                feature_names = [f"Feature_{i}" for i in range(transformed_data.shape[1])]
-                
+        if explainer is not None:
             shap_output = explainer.shap_values(transformed_data)
             
             # For Random Forest, shap_values might be a list or a 3D array
@@ -170,36 +170,45 @@ async def predict_overrun_risk(request: ProjectInferenceRequest):
                 class_1_shap = shap_output[0, :, 1]
             else:
                 class_1_shap = shap_output[0] if len(np.shape(shap_output)) > 1 else shap_output
+        else:
+            classifier = ml_pipeline.named_steps.get('classifier')
+            if hasattr(classifier, 'coef_'):
+                # For linear models like LogisticRegression, approximate impact with feature_value * coefficient
+                # Use toarray() in case it's a sparse matrix
+                arr = transformed_data.toarray()[0] if hasattr(transformed_data, 'toarray') else transformed_data[0]
+                class_1_shap = arr * classifier.coef_[0]
+            else:
+                class_1_shap = np.zeros(transformed_data.shape[1])
                 
-            feature_impacts = list(zip(feature_names, class_1_shap))
-            feature_impacts.sort(key=lambda x: abs(x[1]), reverse=True)
+        feature_impacts = list(zip(feature_names, class_1_shap))
+        feature_impacts.sort(key=lambda x: abs(x[1]), reverse=True)
+        
+        filtered_impacts = []
+        for fname, shap_val in feature_impacts:
+            try:
+                f_idx = list(feature_names).index(fname)
+                f_val = transformed_data[0][f_idx]
+            except ValueError:
+                f_val = None
             
-            filtered_impacts = []
-            for fname, shap_val in feature_impacts:
-                try:
-                    f_idx = list(feature_names).index(fname)
-                    f_val = transformed_data[0][f_idx]
-                except ValueError:
-                    f_val = None
+            # Filter out One-Hot Encoded features that the project does NOT possess
+            if fname.startswith('cat__') and f_val == 0.0:
+                continue
                 
-                # Filter out One-Hot Encoded features that the project does NOT possess
-                if fname.startswith('cat__') and f_val == 0.0:
-                    continue
-                    
-                filtered_impacts.append((fname, shap_val))
+            filtered_impacts.append((fname, shap_val))
+        
+        for fname, shap_val in filtered_impacts[:5]:
+            original_feature_name = fname.split('__')[-1] if '__' in fname else fname
+            direction = "Increases Risk" if shap_val > 0 else "Decreases Risk"
             
-            for fname, shap_val in filtered_impacts[:5]:
-                original_feature_name = fname.split('__')[-1] if '__' in fname else fname
-                direction = "Increases Risk" if shap_val > 0 else "Decreases Risk"
-                
-                explanations.append(FeatureExplanation(
-                    feature_name=original_feature_name,
-                    feature_value=str(input_data.iloc[0].get(original_feature_name, "Categorical/Transformed")),
-                    shap_value=float(shap_val),
-                    impact_direction=direction
-                ))
-        except Exception as e:
-            print(f"Warning: SHAP explanation generation failed: {e}")
+            explanations.append(FeatureExplanation(
+                feature_name=original_feature_name,
+                feature_value=str(input_data.iloc[0].get(original_feature_name, "Categorical/Transformed")),
+                shap_value=float(shap_val),
+                impact_direction=direction
+            ))
+    except Exception as e:
+        print(f"Warning: SHAP explanation generation failed: {e}")
             
     # 3. Compile Historical Timeline
     timeline = []
