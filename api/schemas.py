@@ -75,3 +75,30 @@ class EarlyWarningResponse(BaseModel):
     page: int
     limit: int
     warnings: List[EarlyWarningItem]
+
+class BenchmarkMetrics(BaseModel):
+    group_name: str
+    project_count: int
+    avg_physical_progress: float
+    avg_financial_progress: float
+    avg_predicted_cost_overrun_percent: float
+    avg_predicted_time_delay_months: float
+
+class ProjectBenchmarkResponse(BaseModel):
+    project_id: int
+    project_name: str
+    state: str
+    implementing_agency: str
+    sector: str
+    project_metrics: BenchmarkMetrics
+    agency_benchmark: BenchmarkMetrics
+    state_benchmark: BenchmarkMetrics
+    national_benchmark: BenchmarkMetrics
+
+class AnalyticsOverview(BaseModel):
+    total_projects: int
+    total_high_risk: int
+    total_cost_overrun: int
+    total_time_delayed: int
+    agency_breakdown: List[dict]
+    state_breakdown: List[dict]

@@ -480,6 +480,93 @@ async def get_early_warnings(
         warnings=warnings
     )
 
+from api.schemas import BenchmarkMetrics, ProjectBenchmarkResponse, AnalyticsOverview
+
+def get_benchmark_df():
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+    SELECT 
+        p.project_id, p.project_name, p.state, p.implementing_agency, p.sector, p.approved_cost,
+        e.predicted_cost_cr, e.predicted_delay_months, e.risk_level, e.has_cost_overrun, e.has_time_delay,
+        (SELECT physical_progress FROM project_snapshots WHERE project_id = p.project_id ORDER BY report_date DESC LIMIT 1) as physical_progress,
+        (SELECT financial_progress FROM project_snapshots WHERE project_id = p.project_id ORDER BY report_date DESC LIMIT 1) as financial_progress
+    FROM projects p
+    JOIN early_warnings e ON p.project_id = e.project_id
+    """
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    
+    # Calculate cost overrun %
+    df['cost_overrun_pct'] = (df['predicted_cost_cr'] / df['approved_cost'] - 1) * 100
+    df['cost_overrun_pct'] = df['cost_overrun_pct'].clip(lower=0)
+    return df
+
+def calc_metrics(df_subset, group_name: str) -> BenchmarkMetrics:
+    if df_subset.empty:
+        return BenchmarkMetrics(group_name=group_name, project_count=0, avg_physical_progress=0.0, avg_financial_progress=0.0, avg_predicted_cost_overrun_percent=0.0, avg_predicted_time_delay_months=0.0)
+    
+    return BenchmarkMetrics(
+        group_name=group_name,
+        project_count=len(df_subset),
+        avg_physical_progress=round(df_subset['physical_progress'].mean(), 2),
+        avg_financial_progress=round(df_subset['financial_progress'].mean(), 2),
+        avg_predicted_cost_overrun_percent=round(df_subset['cost_overrun_pct'].mean(), 2),
+        avg_predicted_time_delay_months=round(df_subset['predicted_delay_months'].mean(), 2)
+    )
+
+@app.get("/api/v1/benchmarks/{project_id}", response_model=ProjectBenchmarkResponse)
+async def get_project_benchmark(project_id: int):
+    df = get_benchmark_df()
+    
+    proj_row = df[df['project_id'] == project_id]
+    if proj_row.empty:
+        raise HTTPException(status_code=404, detail="Project not found or lacks early warning data.")
+        
+    proj_state = proj_row.iloc[0]['state']
+    proj_agency = proj_row.iloc[0]['implementing_agency']
+    proj_sector = proj_row.iloc[0]['sector']
+    
+    return ProjectBenchmarkResponse(
+        project_id=project_id,
+        project_name=proj_row.iloc[0]['project_name'],
+        state=proj_state,
+        implementing_agency=proj_agency,
+        sector=str(proj_sector),
+        project_metrics=calc_metrics(proj_row, "This Project"),
+        agency_benchmark=calc_metrics(df[df['implementing_agency'] == proj_agency], f"Agency: {proj_agency}"),
+        state_benchmark=calc_metrics(df[df['state'] == proj_state], f"State: {proj_state}"),
+        national_benchmark=calc_metrics(df, "National Average")
+    )
+
+@app.get("/api/v1/analytics/overview", response_model=AnalyticsOverview)
+async def get_analytics_overview():
+    df = get_benchmark_df()
+    
+    # Agency Breakdown
+    agency_group = df.groupby('implementing_agency').agg({
+        'project_id': 'count',
+        'has_cost_overrun': 'sum',
+        'has_time_delay': 'sum',
+        'cost_overrun_pct': 'mean'
+    }).reset_index().rename(columns={'project_id': 'total_projects'}).sort_values('total_projects', ascending=False).head(10)
+    
+    # State Breakdown
+    state_group = df.groupby('state').agg({
+        'project_id': 'count',
+        'has_cost_overrun': 'sum',
+        'has_time_delay': 'sum',
+        'cost_overrun_pct': 'mean'
+    }).reset_index().rename(columns={'project_id': 'total_projects'}).sort_values('total_projects', ascending=False).head(10)
+    
+    return AnalyticsOverview(
+        total_projects=len(df),
+        total_high_risk=len(df[df['risk_level'] == 'High']),
+        total_cost_overrun=df['has_cost_overrun'].sum(),
+        total_time_delayed=df['has_time_delay'].sum(),
+        agency_breakdown=agency_group.to_dict('records'),
+        state_breakdown=state_group.to_dict('records')
+    )
+
 @app.get("/health")
 async def health_check():
     return {
