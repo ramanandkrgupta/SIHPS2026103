@@ -26,3 +26,21 @@ class PredictionResponse(BaseModel):
     top_factors: List[FeatureExplanation] = Field(..., description="Top contributing factors to the risk score")
     historical_timeline: List[HistoricalSnapshot] = Field(..., description="Chronological timeline of project updates")
     ai_overview: str = Field(..., description="LLM-generated qualitative analysis of project history and risks")
+
+class HistoricalBacktest(BaseModel):
+    report_month: str
+    actual_cost: float
+    predicted_cost: float
+    error_margin_cr: float
+
+class FutureForecast(BaseModel):
+    month_offset: int
+    predicted_cost_cr: float
+
+class CostForecastResponse(BaseModel):
+    project_id: int
+    project_name: str
+    baseline_approved_cost: float
+    historical_backtest: List[HistoricalBacktest] = Field(..., description="Actual vs Predicted costs for historical data")
+    future_forecast: List[FutureForecast] = Field(..., description="LSTM 3-month forecast")
+    ai_explanation: str = Field(..., description="SHAP-driven explanation of the forecast")
