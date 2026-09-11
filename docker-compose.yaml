@@ -7,8 +7,8 @@ services:
       dockerfile: api/Dockerfile
     container_name: sentinel-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       # If you use Google GenAI in production, pass the key here
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -22,8 +22,8 @@ services:
       dockerfile: Dockerfile
     container_name: sentinel-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
 
